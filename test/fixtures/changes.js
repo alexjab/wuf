@@ -47,19 +47,52 @@ module.exports = {
   },
   ride: {
     '2017-08-17': {
+      description: 'The field `price` must now be speficied in cents ' +
+       'and not units of the currency.',
+      validate: {
+        payload: Joi.object().keys({
+          user: Joi.string().required(),
+          from_address: Joi.string().required(),
+          price: Joi.number().required()
+        }).required()
+      },
+      transform: {
+        payload: [
+          Wuf.lazyDowngrade(
+            request => request.price / 100,
+            'price'
+          ),
+          Wuf.lazyUpgrade(
+            'price',
+            response => response.price * 100
+          )
+        ]
+      },
+      response: {
+        schema: Joi.object().keys({
+          id: Joi.string().required(),
+          user: Joi.string().required(),
+          from_address: Joi.string().required(),
+          price: Joi.number().required()
+        }).required().options({ stripUnknown: true })
+      }
+    },
+    '2017-08-16': {
       description: 'Initial API version',
       validate: {
         payload: Joi.object().keys({
           user: Joi.string().required(),
-          from_address: Joi.string().required()
+          from_address: Joi.string().required(),
+          price: Joi.number().required()
         }).required()
       },
       response: {
         schema: Joi.object().keys({
           id: Joi.string().required(),
           user: Joi.string().required(),
-          from_address: Joi.string().required()
-        }).options({ stripUnknown: true })
+          from_address: Joi.string().required(),
+          price: Joi.number().required()
+        }).required().options({ stripUnknown: true })
       }
     }
   }

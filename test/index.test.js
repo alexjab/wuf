@@ -72,16 +72,6 @@ describe('Wuf', () => {
       expect(history._versions[0]).to.have.nested.property('user.validate.payload.isJoi', true)
       expect(history._versions[0]).to.have.nested.property('user.response.schema.isJoi', true)
 
-      expect(history._versions[0]).to.have.property('ride')
-        .that.is.an('object')
-        .that.has.keys('description', 'validate', 'response')
-      expect(history._versions[0]).to.have.nested.property(
-        'ride.description',
-        'Initial API version'
-      )
-      expect(history._versions[0]).to.have.nested.property('ride.validate.payload.isJoi', true)
-      expect(history._versions[0]).to.have.nested.property('ride.response.schema.isJoi', true)
-
       expect(history._versions[1]).to.have.property('_v', '2017-08-16')
       expect(history._versions[1]).to.have.property('user')
         .that.is.an('object')
@@ -99,6 +89,15 @@ describe('Wuf', () => {
           { action: 'copy', after: 'first_name', before: 'firstname' },
           { action: 'remove', after: 'first_name' }
         ])
+      expect(history._versions[1]).to.have.property('ride')
+        .that.is.an('object')
+        .that.has.keys('description', 'validate', 'response')
+      expect(history._versions[1]).to.have.nested.property(
+        'ride.description',
+        'Initial API version'
+      )
+      expect(history._versions[1]).to.have.nested.property('ride.validate.payload.isJoi', true)
+      expect(history._versions[1]).to.have.nested.property('ride.response.schema.isJoi', true)
 
       expect(history._versions[2]).to.have.property('_v', '2017-08-15')
       expect(history._versions[2]).to.have.property('user')
@@ -138,6 +137,38 @@ describe('Wuf', () => {
         payload: {
           first_name: 'Isaac',
           last_name: 'Clarke'
+        }
+      })
+    })
+
+    it('should downgrade the data (with lazy transform)', () => {
+      const history = Wuf.createHistory({ ride: rideChanges })
+      const request = {
+        version: '2017-08-17',
+        payload: {
+          user: 'user_3K5mpxN',
+          from_address: 'USG Ishimura',
+          price: 4000
+        }
+      }
+
+      const { version, payload } = Wuf.downgrade(
+        'ride',
+        request,
+        history
+      )
+      expect(version).to.deep.equal('2017-08-16')
+      expect(payload).to.deep.equal({
+        user: 'user_3K5mpxN',
+        from_address: 'USG Ishimura',
+        price: 40
+      })
+      expect(request).to.deep.equal({
+        version: '2017-08-17',
+        payload: {
+          user: 'user_3K5mpxN',
+          from_address: 'USG Ishimura',
+          price: 4000
         }
       })
     })
@@ -222,6 +253,41 @@ describe('Wuf', () => {
           id: 'user_3K5mpxN',
           firstname: 'Isaac',
           last_name: 'Clarke'
+        }
+      })
+    })
+
+    it('should upgrade the data (with lazy transform)', () => {
+      const history = Wuf.createHistory({ ride: rideChanges })
+      const request = {
+        version: '2017-08-16',
+        payload: {
+          id: 'ride_jeNAH3w',
+          user: 'user_3K5mpxN',
+          from_address: 'USG Ishimura',
+          price: 40
+        }
+      }
+
+      const { version, payload } = Wuf.upgrade(
+        'ride',
+        request,
+        history
+      )
+      expect(version).to.deep.equal('2017-08-17')
+      expect(payload).to.deep.equal({
+        id: 'ride_jeNAH3w',
+        user: 'user_3K5mpxN',
+        from_address: 'USG Ishimura',
+        price: 4000
+      })
+      expect(request).to.deep.equal({
+        version: '2017-08-16',
+        payload: {
+          id: 'ride_jeNAH3w',
+          user: 'user_3K5mpxN',
+          from_address: 'USG Ishimura',
+          price: 40
         }
       })
     })

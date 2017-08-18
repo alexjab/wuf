@@ -16,20 +16,28 @@ function remove (after) {
   return { action: 'remove', after }
 }
 
-function createHistory (models) {
+function lazyDowngrade (fn, before) {
+  return { action: 'lazy', fn, before }
+}
+
+function lazyUpgrade (after, fn) {
+  return { action: 'lazy', after, fn }
+}
+
+function createHistory (resources) {
   const allVersions = {}
   const versionNums = []
-  const names = Object.keys(models)
+  const names = Object.keys(resources)
 
   for (const name of names) {
-    const model = models[name]
-    const nums = Object.keys(model)
+    const resource = resources[name]
+    const nums = Object.keys(resource)
     for (const num of nums) {
       if (!allVersions[num]) {
         versionNums.push(num)
         allVersions[num] = { _v: num }
       }
-      allVersions[num][name] = models[name][num]
+      allVersions[num][name] = resources[name][num]
     }
   }
   versionNums.sort((a, b) => b - a)
@@ -64,6 +72,11 @@ function apply (payload, transformations) {
       const value = get(payload, t.after)
       set(target, t.before, value)
     }
+
+    if (t.action === 'lazy' && t.before) {
+      const value = t.fn(payload)
+      set(target, t.before, value)
+    }
   }
 
   return target
@@ -73,9 +86,21 @@ function apply (payload, transformations) {
 function rollback (payload, transformations) {
   const target = Hoek.clone(payload)
 
-  for (const t of transformations) {
+  const lastIndex = transformations.length - 1
+  for (let i = lastIndex; i >= 0; i--) {
+    const t = transformations[i]
+
+    if (t.action === 'remove') {
+      set(target, null)
+    }
+
     if (t.action === 'copy') {
       const value = get(payload, t.before)
+      set(target, t.after, value)
+    }
+
+    if (t.action === 'lazy' && t.after) {
+      const value = t.fn(payload)
       set(target, t.after, value)
     }
   }
@@ -83,7 +108,7 @@ function rollback (payload, transformations) {
   return target
 }
 
-function downgrade (model, request, history) {
+function downgrade (resource, request, history) {
   let version = request.version
   const index = history._indexes[version]
 
@@ -97,9 +122,9 @@ function downgrade (model, request, history) {
   for (let i = index; i < versions.length; i++) {
     version = versions[i]._v
 
-    if (versions[i][model]) {
-      const validate = versions[i][model].validate
-      const transform = versions[i][model].transform
+    if (versions[i][resource]) {
+      const validate = versions[i][resource].validate
+      const transform = versions[i][resource].transform
 
       if (i === index && validate) {
         payload = Joi.attempt(
@@ -117,7 +142,7 @@ function downgrade (model, request, history) {
   return { version, payload }
 }
 
-function upgrade (model, response, history) {
+function upgrade (resource, response, history) {
   let version = response.version
   const index = history._indexes[version]
 
@@ -131,9 +156,9 @@ function upgrade (model, response, history) {
   for (let i = index; i >= 0; i--) {
     version = versions[i]._v
 
-    if (versions[i][model]) {
-      const format = versions[i][model].response
-      const transform = versions[i][model].transform
+    if (versions[i][resource]) {
+      const format = versions[i][resource].response
+      const transform = versions[i][resource].transform
 
       if (transform) {
         payload = rollback(payload, transform.payload)
@@ -154,6 +179,8 @@ function upgrade (model, response, history) {
 module.exports = {
   copy,
   remove,
+  lazyDowngrade,
+  lazyUpgrade,
 
   createHistory,
   downgrade,

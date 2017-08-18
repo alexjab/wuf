@@ -1,13 +1,13 @@
 {
   "name": "wuf",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "An API versioning tool",
   "main": "index.js",
   "scripts": {
     "lint": "standard | snazzy",
-    "test": "npm run lint && npm run unit",
     "unit": "mocha ./test",
-    "cover": "nyc npm run test"
+    "test": "npm run lint && npm run unit",
+    "cover": "npm run lint && nyc npm run unit"
   },
   "author": "alex@jablon.me",
   "license": "MIT",
