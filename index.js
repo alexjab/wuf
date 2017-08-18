@@ -1,10 +1,12 @@
+// TODO downgrade / upgrade to specific version
+// TODO allow custom/lazy operation
+// TODO make a test method with rolls all the migrations with allow unknown
 const Joi = require('joi')
 const Hoek = require('hoek')
 
 const unset = require('lodash.unset')
 const set = require('lodash.set')
 const get = require('lodash.get')
-
 
 function copy (after, before) {
   return { action: 'copy', after, before }
@@ -23,8 +25,8 @@ function createHistory (models) {
     const model = models[name]
     const nums = Object.keys(model)
     for (const num of nums) {
-      versionNums.push(num)
       if (!allVersions[num]) {
+        versionNums.push(num)
         allVersions[num] = { _v: num }
       }
       allVersions[num][name] = models[name][num]
@@ -50,106 +52,109 @@ function createHistory (models) {
 }
 
 // Applying the transformation means downgrading
-function apply (data, original, transformations) {
+function apply (payload, transformations) {
+  const target = Hoek.clone(payload)
+
   for (const t of transformations) {
     if (t.action === 'remove') {
-      unset(data, t.after)
+      unset(target, t.after)
     }
 
     if (t.action === 'copy') {
-      const value = get(original, t.after)
-      set(data, t.before, value)
+      const value = get(payload, t.after)
+      set(target, t.before, value)
     }
   }
+
+  return target
 }
 
 // Rollbacking the transformation means upgrading
-function rollback (data, original, transformations) {
+function rollback (payload, transformations) {
+  const target = Hoek.clone(payload)
+
   for (const t of transformations) {
     if (t.action === 'copy') {
-      const value = get(data, t.before)
-      unset(data, t.before)
-      set(data, t.after, value)
+      const value = get(payload, t.before)
+      set(target, t.after, value)
     }
   }
+
+  return target
 }
 
 function downgrade (model, request, history) {
-  const version = request.version
-  const _request = {}
+  let version = request.version
   const index = history._indexes[version]
-  const versions = history._versions
 
   if (!index && index !== 0) {
     throw new Error('Invalid version')
   }
 
-  _request.payload = Hoek.clone(request.payload)
+  const versions = history._versions
+  let payload = Hoek.clone(request.payload)
 
   for (let i = index; i < versions.length; i++) {
-    _request.version = versions[i]._v
+    version = versions[i]._v
 
     if (versions[i][model]) {
       const validate = versions[i][model].validate
       const transform = versions[i][model].transform
 
-      if (validate && i === index) {
-        _request.payload = Joi.attempt(
-          _request.payload,
+      if (i === index && validate) {
+        payload = Joi.attempt(
+          request.payload,
           validate.payload
         )
       }
 
       if (transform) {
-        apply(_request.payload, Hoek.clone(request.payload), transform.payload)
+        payload = apply(payload, transform.payload)
       }
     }
   }
 
-  for (const field of Object.keys(request)) {
-    if (!_request[field] && request[field]) {
-      _request[field] = request[field]
-    }
-  }
-
-  return _request
+  return { version, payload }
 }
 
-function upgrade (model, input, history) {
-  const version = input.version
-  const _input = {}
-  _input.payload = Hoek.clone(input.payload)
+function upgrade (model, response, history) {
+  let version = response.version
   const index = history._indexes[version]
-  const versions = history._versions
 
   if (!index && index !== 0) {
     throw new Error('Invalid version')
   }
 
+  const versions = history._versions
+  let payload = Hoek.clone(response.payload)
+
   for (let i = index; i >= 0; i--) {
-    _input.version = versions[i]._v
+    version = versions[i]._v
 
     if (versions[i][model]) {
+      const format = versions[i][model].response
       const transform = versions[i][model].transform
 
       if (transform) {
-        rollback(_input.payload, Hoek.clone(input.payload), transform.payload)
+        payload = rollback(payload, transform.payload)
+      }
+
+      if (i === 0 && format) {
+        payload = Joi.attempt(
+          payload,
+          format.schema
+        )
       }
     }
   }
 
-  for (const field of Object.keys(input)) {
-    if (!_input[field] && input[field]) {
-      _input[field] = input[field]
-    }
-  }
-
-  return _input
+  return { version, payload }
 }
 
 module.exports = {
   copy,
   remove,
+
   createHistory,
   downgrade,
   upgrade
