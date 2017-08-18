@@ -1,7 +1,7 @@
 {
   "name": "wuf",
   "version": "1.0.0",
-  "description": "",
+  "description": "An API versioning tool",
   "main": "index.js",
   "scripts": {
     "lint": "standard | snazzy",
@@ -9,7 +9,7 @@
     "unit": "mocha ./test",
     "cover": "nyc npm run test"
   },
-  "author": "",
+  "author": "alex@jablon.me",
   "license": "MIT",
   "dependencies": {
     "hoek": "^4.2.0",
@@ -32,6 +32,20 @@
     ]
   },
   "standard": {
-    "globals": [ "describe", "it" ]
-  }
+    "globals": [
+      "describe",
+      "it"
+    ]
+  },
+  "directories": {
+    "test": "test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/alexjab/wuf.git"
+  },
+  "bugs": {
+    "url": "https://github.com/alexjab/wuf/issues"
+  },
+  "homepage": "https://github.com/alexjab/wuf#readme"
 }
